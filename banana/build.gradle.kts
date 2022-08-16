@@ -40,7 +40,7 @@ kapt {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.8.0")
-    implementation("androidx.appcompat:appcompat:1.4.2")
+    implementation("androidx.appcompat:appcompat:1.5.0")
     implementation("com.google.android.material:material:1.6.1")
     api(project(":banana-api"))
     api(project(":apple-api"))
