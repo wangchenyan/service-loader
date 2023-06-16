@@ -42,7 +42,9 @@ object ServiceLoader {
 
     @Synchronized
     fun <T : Any> loadAll(service: KClass<T>): List<T> {
-        return serviceMap[service]!!.map { loadInternal(it) } as List<T>
+        return serviceMap[service]?.let { list ->
+            list.map { loadInternal(it) } as List<T>
+        } ?: emptyList()
     }
 
     private fun <T : Any> loadInternal(implClass: KClass<T>): T {
