@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("auto-register")
+    id("kotlin-kapt")
 }
 
 android {
@@ -41,6 +42,12 @@ android {
     }
 }
 
+kapt {
+    arguments {
+        arg("moduleName", project.name)
+    }
+}
+
 autoregister {
     registerInfo = ArrayList<Map<String, Any>?>().apply {
         add(
@@ -60,6 +67,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.5.0")
     implementation("com.google.android.material:material:1.6.1")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    kapt(project(":service-loader-compiler"))
     implementation(project(":service-loader-api"))
     implementation(project(":apple"))
     implementation(project(":banana"))

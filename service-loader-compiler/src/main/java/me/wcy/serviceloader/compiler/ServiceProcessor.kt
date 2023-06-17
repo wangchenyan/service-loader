@@ -12,6 +12,7 @@ import com.squareup.kotlinpoet.WildcardTypeName
 import com.squareup.kotlinpoet.asTypeName
 import me.wcy.serviceloader.annotation.IServiceLoader
 import me.wcy.serviceloader.annotation.ServiceImpl
+import me.wcy.serviceloader.annotation.ServiceImplEntity
 import javax.annotation.processing.AbstractProcessor
 import javax.annotation.processing.Filer
 import javax.annotation.processing.ProcessingEnvironment
@@ -80,7 +81,7 @@ class ServiceProcessor : AbstractProcessor() {
             return false
         }
 
-        val serviceMap = mutableMapOf<KClass<*>, MutableList<TypeMirror>>()
+        val serviceMap = mutableMapOf<KClass<*>, MutableList<Pair<TypeMirror, Boolean>>>()
 
         taskElements.forEach { element ->
             val typeElement = (element as? TypeElement) ?: return@forEach
@@ -101,7 +102,7 @@ class ServiceProcessor : AbstractProcessor() {
                 serviceMap[service] = mutableListOf()
                 serviceMap[service]!!
             }
-            list.add(typeElement.asType())
+            list.add(Pair(typeElement.asType(), anno.singleton))
         }
 
         if (serviceMap.isEmpty()) {
@@ -115,12 +116,17 @@ class ServiceProcessor : AbstractProcessor() {
             KClass::class.asTypeName().parameterizedBy(WildcardTypeName.producerOf(Any::class))
 
         /**
-         * Param type: List<KClass<out Any>>
+         * Param type: ServiceImplEntity
          */
-        val setTypeName = List::class.asTypeName().parameterizedBy(kClassTypeName)
+        val entityTypeName = ServiceImplEntity::class.asTypeName()
 
         /**
-         * Param type: MutableMap<KClass<out Any>, List<KClass<out Any>>>
+         * Param type: List<ServiceImplEntity>
+         */
+        val setTypeName = List::class.asTypeName().parameterizedBy(entityTypeName)
+
+        /**
+         * Param type: MutableMap<KClass<out Any>, List<ServiceImplEntity>>
          */
         val mapTypeName = ClassName(
             "kotlin.collections",
@@ -128,7 +134,7 @@ class ServiceProcessor : AbstractProcessor() {
         ).parameterizedBy(kClassTypeName, setTypeName)
 
         /**
-         * Param name: map: MutableMap<KClass<out Any>, List<KClass<out Any>>>
+         * Param name: map: MutableMap<KClass<out Any>, List<ServiceImplEntity>>
          *
          * There's no such type as MutableList at runtime so the library only sees the runtime type.
          * If you need MutableList then you'll need to use a ClassName to create it.
@@ -138,7 +144,7 @@ class ServiceProcessor : AbstractProcessor() {
             ParameterSpec.builder(ProcessorUtils.PARAM_MAP_NAME, mapTypeName).build()
 
         /**
-         * Method: override fun load(map: MutableMap<KClass<out Any>, List<KClass<out Any>>>)
+         * Method: override fun load(map: MutableMap<KClass<out Any>, List<ServiceImplEntity>>)
          */
         val loadTaskMethodBuilder = FunSpec.builder(ProcessorUtils.METHOD_LOAD_NAME)
             .addModifiers(KModifier.OVERRIDE)
@@ -146,20 +152,20 @@ class ServiceProcessor : AbstractProcessor() {
 
         serviceMap.forEach { (service, implList) ->
             /**
-             * Statement: map.put(Service::class, listOf(ServiceImpl::class))
+             * Statement: map.put(Service::class, listOf(ServiceImplEntity(ServiceImpl::class, true)))
              */
             val format = StringBuilder()
             val args: MutableList<Any> = mutableListOf(ProcessorUtils.PARAM_MAP_NAME, service.java)
             implList.forEach {
-                format.append("%T::class,")
-                args.add(it)
+                format.append("%T(%T::class, ${it.second}),\n")
+                args.addAll(listOf(ServiceImplEntity::class, it.first))
             }
             if (format.isNotEmpty()) {
-                format.deleteAt(format.length - 1)
+                format.deleteAt(format.length - 2)
             }
 
             loadTaskMethodBuilder.addStatement(
-                "%N.put(%T::class, listOf($format))",
+                "%N.put(%T::class, listOf(\n$format))",
                 *args.toTypedArray()
             )
         }

@@ -1,6 +1,7 @@
 package me.wcy.serviceloader.api
 
 import me.wcy.serviceloader.annotation.IServiceLoader
+import me.wcy.serviceloader.annotation.ServiceImplEntity
 import kotlin.reflect.KClass
 
 /**
@@ -8,8 +9,8 @@ import kotlin.reflect.KClass
  */
 object ServiceLoader {
     private const val TAG = "ServiceLoader"
-    private val serviceMap = mutableMapOf<KClass<*>, MutableList<KClass<*>>>()
-    private val implMap = mutableMapOf<KClass<*>, Any>()
+    private val serviceMap = mutableMapOf<KClass<*>, MutableList<ServiceImplEntity>>()
+    private val singletonImplMap = mutableMapOf<KClass<*>, Any>()
 
     init {
         init()
@@ -20,7 +21,7 @@ object ServiceLoader {
 
     @Synchronized
     fun register(loader: IServiceLoader) {
-        val map = mutableMapOf<KClass<*>, List<KClass<*>>>()
+        val map = mutableMapOf<KClass<*>, List<ServiceImplEntity>>()
         loader.load(map)
         combineService(map)
     }
@@ -43,18 +44,22 @@ object ServiceLoader {
     @Synchronized
     fun <T : Any> loadAll(service: KClass<T>): List<T> {
         return serviceMap[service]?.let { list ->
-            list.map { loadInternal(it) } as List<T>
+            list.map { loadInternal(it) }
         } ?: emptyList()
     }
 
-    private fun <T : Any> loadInternal(implClass: KClass<T>): T {
-        if (implMap.containsKey(implClass).not()) {
-            implMap[implClass] = implClass.java.newInstance()
+    private fun <T : Any> loadInternal(implEntity: ServiceImplEntity): T {
+        return if (implEntity.singleton) {
+            if (singletonImplMap.containsKey(implEntity.implClass).not()) {
+                singletonImplMap[implEntity.implClass] = implEntity.implClass.java.newInstance()
+            }
+            singletonImplMap[implEntity.implClass] as T
+        } else {
+            implEntity.implClass.java.newInstance() as T
         }
-        return implMap[implClass] as T
     }
 
-    private fun combineService(map: Map<KClass<*>, List<KClass<*>>>) {
+    private fun combineService(map: Map<KClass<*>, List<ServiceImplEntity>>) {
         map.forEach { entry ->
             val implList = serviceMap[entry.key] ?: kotlin.run {
                 serviceMap[entry.key] = mutableListOf()

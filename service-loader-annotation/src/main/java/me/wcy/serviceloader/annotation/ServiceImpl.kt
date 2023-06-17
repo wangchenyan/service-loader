@@ -8,5 +8,6 @@ import kotlin.reflect.KClass
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class ServiceImpl(
-    val value: KClass<*>
+    val value: KClass<*>,
+    val singleton: Boolean = true
 )
