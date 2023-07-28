@@ -15,7 +15,7 @@ Android 支持组件化的服务发现框架
 ### 1. 添加 Jitpack 仓库
 
 ```kotlin
-// settings build file
+// settings file
 pluginManagement {
     repositories {
         maven("https://jitpack.io")
