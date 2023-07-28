@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    namespace = "me.wcy.serviceloader.api"
     compileSdk = 32
 
     defaultConfig {

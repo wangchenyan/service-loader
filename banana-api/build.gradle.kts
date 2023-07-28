@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace = "me.wcy.banana.api"
     compileSdk = 32
 
     defaultConfig {

@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    namespace = "me.wcy.apple"
     compileSdk = 32
 
     defaultConfig {

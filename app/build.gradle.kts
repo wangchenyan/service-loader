@@ -6,6 +6,7 @@ plugins {
 }
 
 android {
+    namespace = "me.wcy.serviceloader.app"
     compileSdk = 32
 
     defaultConfig {
@@ -49,17 +50,15 @@ kapt {
 }
 
 autoregister {
-    registerInfo = ArrayList<Map<String, Any>?>().apply {
-        add(
-            mapOf(
-                "scanInterface" to "me.wcy.serviceloader.annotation.IServiceLoader",
-                "codeInsertToClassName" to "me.wcy.serviceloader.api.ServiceLoader",
-                "codeInsertToMethodName" to "init",
-                "registerMethodName" to "register",
-                "include" to listOf("me/wcy/serviceloader/apt/.*")
-            )
+    registerInfo = listOf(
+        mapOf(
+            "scanInterface" to "me.wcy.serviceloader.annotation.IServiceLoader",
+            "codeInsertToClassName" to "me.wcy.serviceloader.api.ServiceLoader",
+            "codeInsertToMethodName" to "init",
+            "registerMethodName" to "register",
+            "include" to listOf("me/wcy/serviceloader/apt/.*")
         )
-    }
+    )
 }
 
 dependencies {
