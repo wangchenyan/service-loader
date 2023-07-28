@@ -2,11 +2,12 @@
 
 [![](https://jitpack.io/v/wangchenyan/service-loader.svg)](https://jitpack.io/#wangchenyan/service-loader)
 
-Android 支持组件化的服务发现框架
+> 优先推荐使用 [Hilt](https://developer.android.com/training/dependency-injection/hilt-android)，如果觉得 Hilt 太麻烦，可以尝试本框架。
+
+Android 轻量级服务发现框架
 
 ## Feature
 
-- 适用于组件化项目
 - 服务发现能力
 - 支持单例模式和非单例模式
 
