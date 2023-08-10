@@ -1,16 +1,16 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "me.wcy.apple"
-    compileSdk = 32
+    compileSdk = 33
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 32
+        targetSdk = 33
 
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -33,16 +33,11 @@ android {
     }
 }
 
-kapt {
-    arguments {
-        arg("moduleName", project.name)
-    }
+ksp {
+    arg("moduleName", project.name)
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.8.0")
-    implementation("androidx.appcompat:appcompat:1.5.0")
-    implementation("com.google.android.material:material:1.6.1")
     api(project(":apple-api"))
-    kapt(project(":service-loader-compiler"))
+    ksp(project(":service-loader-compiler"))
 }

@@ -1,45 +1,36 @@
 package me.wcy.serviceloader.compiler
 
+import com.google.devtools.ksp.processing.KSPLogger
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.net.UnknownHostException
-import javax.annotation.processing.Messager
-import javax.tools.Diagnostic
 
 object Log {
-    private var messager: Messager? = null
-    private var tag: String = "Log"
+    private var logger: KSPLogger? = null
 
-    fun setLogger(messager: Messager) {
-        this.messager = messager
+    fun setLogger(logger: KSPLogger) {
+        this.logger = logger
     }
 
-    fun setTag(tag: String) {
-        this.tag = tag
+    fun i(tag: String, msg: String) {
+        logger?.info("[$tag] $msg")
     }
 
-    fun i(msg: String) {
-        messager?.printMessage(Diagnostic.Kind.NOTE, "[$tag] $msg\n")
+    fun w(tag: String, msg: String) {
+        logger?.warn("[$tag] $msg")
     }
 
-    fun w(msg: String) {
-        messager?.printMessage(Diagnostic.Kind.WARNING, "[$tag] $msg\n")
+    fun e(tag: String, msg: String) {
+        logger?.error("[$tag] $msg")
     }
 
-    fun e(msg: String) {
-        messager?.printMessage(Diagnostic.Kind.ERROR, "[$tag] $msg\n")
+    fun e(tag: String, msg: String, tr: Throwable) {
+        logger?.error("[$tag] $msg\n${getStackTraceString(tr)}\n")
     }
 
-    fun exception(msg: String) {
-        e(msg)
+    fun exception(tag: String, msg: String) {
+        e(tag, msg)
         throw IllegalStateException("[$tag] $msg")
-    }
-
-    fun e(msg: String, tr: Throwable) {
-        messager?.printMessage(
-            Diagnostic.Kind.ERROR,
-            "[$tag] $msg\n${getStackTraceString(tr)}\n"
-        )
     }
 
     /**

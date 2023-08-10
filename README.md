@@ -66,17 +66,15 @@ autoregister {
 ```kotlin
 // app build file
 plugins {
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 
-kapt {
-    arguments {
-        arg("moduleName", project.name)
-    }
+ksp {
+    arg("moduleName", project.name)
 }
 
 dependencies {
-    kapt("com.github.wangchenyan.service-loader:service-loader-compiler:${latestVersion}")
+    ksp("com.github.wangchenyan.service-loader:service-loader-compiler:${latestVersion}")
     implementation("com.github.wangchenyan.service-loader:service-loader-api:${latestVersion}")
 }
 ```

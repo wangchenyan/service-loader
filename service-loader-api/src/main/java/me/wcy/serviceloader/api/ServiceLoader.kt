@@ -1,7 +1,7 @@
 package me.wcy.serviceloader.api
 
 import me.wcy.serviceloader.annotation.IServiceLoader
-import me.wcy.serviceloader.annotation.ServiceImplEntity
+import me.wcy.serviceloader.annotation.ServiceImplInfo
 import kotlin.reflect.KClass
 
 /**
@@ -17,11 +17,12 @@ object ServiceLoader {
     }
 
     private fun init() {
+        // Inject code here
     }
 
     @Synchronized
     fun register(loader: IServiceLoader) {
-        val map = mutableMapOf<KClass<*>, List<ServiceImplEntity>>()
+        val map = mutableMapOf<String, List<ServiceImplInfo>>()
         loader.load(map)
         combineService(map)
     }
@@ -59,15 +60,20 @@ object ServiceLoader {
         }
     }
 
-    private fun combineService(map: Map<KClass<*>, List<ServiceImplEntity>>) {
+    private fun combineService(map: Map<String, List<ServiceImplInfo>>) {
         map.forEach { entry ->
-            val implList = serviceMap[entry.key] ?: kotlin.run {
-                serviceMap[entry.key] = mutableListOf()
-                serviceMap[entry.key]!!
+            val service = Class.forName(entry.key).kotlin
+            val implList = serviceMap[service] ?: kotlin.run {
+                serviceMap[service] = mutableListOf()
+                serviceMap[service]!!
             }
             entry.value.forEach {
-                if (it !in implList) {
-                    implList.add(it)
+                val entity = ServiceImplEntity(
+                    Class.forName(it.implClassName).kotlin,
+                    it.singleton
+                )
+                if (entity !in implList) {
+                    implList.add(entity)
                 }
             }
         }

@@ -1,5 +1,18 @@
 package me.wcy.serviceloader.compiler
 
+import com.google.devtools.ksp.KSTypeNotPresentException
+import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.getAnnotationsByType
+import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.DelicateKotlinPoetApi
 import com.squareup.kotlinpoet.FileSpec
@@ -8,164 +21,122 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.WildcardTypeName
 import com.squareup.kotlinpoet.asTypeName
 import me.wcy.serviceloader.annotation.IServiceLoader
 import me.wcy.serviceloader.annotation.ServiceImpl
-import me.wcy.serviceloader.annotation.ServiceImplEntity
-import javax.annotation.processing.AbstractProcessor
-import javax.annotation.processing.Filer
-import javax.annotation.processing.ProcessingEnvironment
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.SourceVersion
-import javax.lang.model.element.TypeElement
-import javax.lang.model.type.MirroredTypeException
-import javax.lang.model.type.TypeMirror
-import javax.lang.model.util.Elements
-import javax.lang.model.util.Types
-import kotlin.reflect.KClass
+import me.wcy.serviceloader.annotation.ServiceImplInfo
 
 /**
  * Created by wangchenyan.top on 2022/8/10.
  */
-class ServiceProcessor : AbstractProcessor() {
-    private lateinit var filer: Filer
-    private lateinit var elementUtil: Elements
-    private lateinit var typeUtil: Types
+class ServiceProcessor : SymbolProcessor, SymbolProcessorProvider {
+    private lateinit var codeGenerator: CodeGenerator
     private lateinit var moduleName: String
 
-    override fun init(processingEnv: ProcessingEnvironment) {
-        super.init(processingEnv)
-        filer = processingEnv.filer
-        elementUtil = processingEnv.elementUtils
-        typeUtil = processingEnv.typeUtils
-        Log.setTag(TAG)
-        Log.setLogger(processingEnv.messager)
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
+        Log.setLogger(environment.logger)
+        codeGenerator = environment.codeGenerator
 
-        val moduleName = processingEnv.options["moduleName"]
-        if (moduleName == null || moduleName.isEmpty()) {
+        val moduleName = environment.options["moduleName"]
+        if (moduleName.isNullOrEmpty()) {
             Log.exception(
-                "Can not find apt argument 'moduleName', check if has add the code like this in module's build.gradle:\n" +
-                        "    In Kotlin:\n" +
-                        "    \n" +
-                        "    kapt {\n" +
-                        "        arguments {\n" +
-                        "          arg(\"moduleName\", project.name)\n" +
-                        "        }\n" +
-                        "    }\n"
+                TAG,
+                "Can not find ksp argument 'moduleName', check if has add the code like this in module's build.gradle.kts:\n" +
+                        "\n" +
+                        "    ksp {\n" +
+                        "        arg(\"moduleName\", project.name)\n" +
+                        "    }" +
+                        "\n"
             )
         }
 
         this.moduleName = ProcessorUtils.formatModuleName(moduleName!!)
 
-        Log.i("Start to deal module ${this.moduleName}")
+        Log.w(TAG, "Start to deal module ${this.moduleName}")
+        return this
     }
 
-    override fun getSupportedAnnotationTypes(): MutableSet<String> {
-        val supportAnnotationTypes = mutableSetOf<String>()
-        supportAnnotationTypes.add(ServiceImpl::class.java.canonicalName)
-        return supportAnnotationTypes
-    }
-
-    override fun getSupportedSourceVersion(): SourceVersion {
-        return SourceVersion.latestSupported()
-    }
-
-    @OptIn(DelicateKotlinPoetApi::class)
-    override fun process(
-        annotations: MutableSet<out TypeElement>?,
-        roundEnv: RoundEnvironment
-    ): Boolean {
-        val taskElements = roundEnv.getElementsAnnotatedWith(ServiceImpl::class.java)
-        if (taskElements == null || taskElements.size == 0) {
-            return false
+    @OptIn(KspExperimental::class, DelicateKotlinPoetApi::class)
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val serviceImplList =
+            resolver.getSymbolsWithAnnotation(ServiceImpl::class.java.name).toList()
+        if (serviceImplList.isEmpty()) {
+            return emptyList()
         }
 
-        val serviceMap = mutableMapOf<KClass<*>, MutableList<Pair<TypeMirror, Boolean>>>()
+        val serviceMap = mutableMapOf<String, MutableList<Pair<String, Boolean>>>()
 
-        taskElements.forEach { element ->
-            val typeElement = (element as? TypeElement) ?: return@forEach
-            val anno = typeElement.getAnnotation(ServiceImpl::class.java)
-            val service = try {
-                anno.value
-            } catch (e: MirroredTypeException) {
-                val className = e.typeMirror.asTypeName().toString()
-                Class.forName(className).kotlin
+        serviceImplList.forEach {
+            checkDeclaration(it)
+            val declaration = it as KSDeclaration
+            val anno = declaration.getAnnotationsByType(ServiceImpl::class).first()
+            val serviceName = anno.getServiceName()
+            val implName = it.toClassName().canonicalName
+
+            Log.w(TAG, "Collected service: $implName -> $serviceName")
+
+            val list = serviceMap[serviceName] ?: kotlin.run {
+                serviceMap[serviceName] = mutableListOf()
+                serviceMap[serviceName]!!
             }
-            val serviceType = elementUtil.getTypeElement(service.qualifiedName).asType()
-            val implType = typeElement.asType()
-            if (typeUtil.isSubtype(implType, serviceType).not()) {
-                Log.exception("Impl $implType is not a Subtype of Service $serviceType")
-            }
-            Log.i("Collected Service: ${typeElement.qualifiedName} -> ${service.qualifiedName}")
-            val list = serviceMap[service] ?: kotlin.run {
-                serviceMap[service] = mutableListOf()
-                serviceMap[service]!!
-            }
-            list.add(Pair(typeElement.asType(), anno.singleton))
+            list.add(Pair(implName, anno.singleton))
         }
 
         if (serviceMap.isEmpty()) {
-            return false
+            return emptyList()
         }
 
         /**
-         * Param type: KClass<out Any>
+         * Param type: ServiceImplInfo
          */
-        val kClassTypeName =
-            KClass::class.asTypeName().parameterizedBy(WildcardTypeName.producerOf(Any::class))
+        val entityTypeName = ServiceImplInfo::class.asTypeName()
 
         /**
-         * Param type: ServiceImplEntity
-         */
-        val entityTypeName = ServiceImplEntity::class.asTypeName()
-
-        /**
-         * Param type: List<ServiceImplEntity>
+         * Param type: List<ServiceImplInfo>
          */
         val setTypeName = List::class.asTypeName().parameterizedBy(entityTypeName)
 
         /**
-         * Param type: MutableMap<KClass<out Any>, List<ServiceImplEntity>>
+         * Param type: MutableMap<String, List<ServiceImplInfo>>
          */
         val mapTypeName = ClassName(
             "kotlin.collections",
             "MutableMap"
-        ).parameterizedBy(kClassTypeName, setTypeName)
+        ).parameterizedBy(String::class.asTypeName(), setTypeName)
 
         /**
-         * Param name: map: MutableMap<KClass<out Any>, List<ServiceImplEntity>>
+         * Param name: map: MutableMap<String, List<ServiceImplInfo>>
          *
-         * There's no such type as MutableList at runtime so the library only sees the runtime type.
-         * If you need MutableList then you'll need to use a ClassName to create it.
+         * There's no such type as MutableMap at runtime so the library only sees the runtime type.
+         * If you need MutableMap then you'll need to use a ClassName to create it.
          * [https://github.com/square/kotlinpoet/issues/482]
          */
         val mapParamSpec =
             ParameterSpec.builder(ProcessorUtils.PARAM_MAP_NAME, mapTypeName).build()
 
         /**
-         * Method: override fun load(map: MutableMap<KClass<out Any>, List<ServiceImplEntity>>)
+         * Method: override fun load(map: MutableMap<String, List<ServiceImplInfo>>)
          */
         val loadTaskMethodBuilder = FunSpec.builder(ProcessorUtils.METHOD_LOAD_NAME)
             .addModifiers(KModifier.OVERRIDE)
             .addParameter(mapParamSpec)
 
-        serviceMap.forEach { (service, implList) ->
+        serviceMap.forEach { (serviceName, implList) ->
             /**
-             * Statement: map.put(Service::class, listOf(ServiceImplEntity(ServiceImpl::class, true)))
+             * Statement: map.put(serviceName, listOf(ServiceImplInfo(serviceImplName, true)))
              */
             val format = StringBuilder()
-            val args: MutableList<Any> = mutableListOf(ProcessorUtils.PARAM_MAP_NAME, service.java)
+            val args: MutableList<Any> = mutableListOf(ProcessorUtils.PARAM_MAP_NAME, serviceName)
             implList.forEach {
-                format.append("%T(%T::class, ${it.second}),\n")
-                args.addAll(listOf(ServiceImplEntity::class, it.first))
+                format.append("%T(%S, %L),\n")
+                args.addAll(listOf(ServiceImplInfo::class, it.first, it.second))
             }
             if (format.isNotEmpty()) {
                 format.deleteAt(format.length - 2)
             }
 
             loadTaskMethodBuilder.addStatement(
-                "%N.put(%T::class, listOf(\n$format))",
+                "%N.put(%S, listOf(\n$format))",
                 *args.toTypedArray()
             )
         }
@@ -173,7 +144,7 @@ class ServiceProcessor : AbstractProcessor() {
         /**
          * Write to file
          */
-        FileSpec.builder(ProcessorUtils.PACKAGE_NAME, "ServiceLoader\$$moduleName")
+        val fileSpec = FileSpec.builder(ProcessorUtils.PACKAGE_NAME, "ServiceLoader\$$moduleName")
             .addType(
                 TypeSpec.classBuilder("ServiceLoader\$$moduleName")
                     .addKdoc(ProcessorUtils.JAVADOC)
@@ -182,9 +153,40 @@ class ServiceProcessor : AbstractProcessor() {
                     .build()
             )
             .build()
-            .writeTo(filer)
 
-        return true
+        val file =
+            codeGenerator.createNewFile(Dependencies.ALL_FILES, fileSpec.packageName, fileSpec.name)
+        file.write(fileSpec.toString().toByteArray())
+
+        return emptyList()
+    }
+
+    /**
+     * 检查注解是否合法
+     * 1. 注解类为 Class 类型
+     * 2. 注解类实现注解中的接口
+     */
+    @OptIn(KspExperimental::class)
+    private fun checkDeclaration(annotated: KSAnnotated) {
+        check(annotated is KSClassDeclaration) {
+            "Type [${annotated}] with annotation [${ServiceImpl::class.java.name}] should be a class"
+        }
+        val anno = annotated.getAnnotationsByType(ServiceImpl::class).first()
+        val serviceName = anno.getServiceName()
+        checkNotNull(annotated.getAllSuperTypes().find {
+            it.declaration.toClassName().canonicalName == serviceName
+        }) {
+            "Type [${annotated.toClassName().canonicalName}] with annotation [${ServiceImpl::class.java.name}] should implements [$serviceName]"
+        }
+    }
+
+    @OptIn(KspExperimental::class)
+    private fun ServiceImpl.getServiceName(): String {
+        return try {
+            value.qualifiedName ?: ""
+        } catch (e: KSTypeNotPresentException) {
+            e.ksType.declaration.qualifiedName!!.asString()
+        }
     }
 
     companion object {

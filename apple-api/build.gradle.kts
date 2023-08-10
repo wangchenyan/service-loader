@@ -5,11 +5,11 @@ plugins {
 
 android {
     namespace = "me.wcy.apple.api"
-    compileSdk = 32
+    compileSdk = 33
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 32
+        targetSdk = 33
 
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -33,8 +33,5 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.8.0")
-    implementation("androidx.appcompat:appcompat:1.5.0")
-    implementation("com.google.android.material:material:1.6.1")
     api(project(":service-loader-api"))
 }

@@ -2,17 +2,17 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("auto-register")
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "me.wcy.serviceloader.app"
-    compileSdk = 32
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "me.wcy.serviceloader.app"
         minSdk = 21
-        targetSdk = 32
+        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
     }
@@ -43,10 +43,8 @@ android {
     }
 }
 
-kapt {
-    arguments {
-        arg("moduleName", project.name)
-    }
+ksp {
+    arg("moduleName", project.name)
 }
 
 autoregister {
@@ -62,11 +60,11 @@ autoregister {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.8.0")
-    implementation("androidx.appcompat:appcompat:1.5.0")
-    implementation("com.google.android.material:material:1.6.1")
+    implementation("androidx.core:core-ktx:1.10.1")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    kapt(project(":service-loader-compiler"))
+    ksp(project(":service-loader-compiler"))
     implementation(project(":service-loader-api"))
     implementation(project(":apple"))
     implementation(project(":banana"))
